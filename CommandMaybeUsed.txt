@@ -1,0 +1,1 @@
+processing-java --sketch=/Users/leo101317/desktop/ProcessingDirectory/Kinect2Sound --output=/Users/leo101317/desktop/ProcessingDirectory/Kinect2Sound/output_dir --force --run
