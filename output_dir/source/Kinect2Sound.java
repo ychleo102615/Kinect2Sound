@@ -32,6 +32,7 @@ PImage img;
 
 BlobHandler blobHandler = new BlobHandler();
 ArrayList<Blob> trackedBlobs = new ArrayList<Blob>();
+float similarPixelThreshold = 200;
 /*
     Minim Zone
 */
@@ -99,7 +100,6 @@ public void draw() {
             float b2 = blue(trackColor);
 
             float d = distSq(r1, g1, b1, r2, g2, b2);
-            float similarPixelThreshold = 600;
             if(d < similarPixelThreshold){
                 blobHandler.addToCompartBlob(blobs, x, y);
             }
@@ -112,7 +112,7 @@ public void draw() {
         b.show();
     }
 
-    setPhonographs();
+    // setPhonographs();
 
     // Show track color
     fill(trackColor);

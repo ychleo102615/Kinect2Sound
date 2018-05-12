@@ -4,6 +4,7 @@ class Blob {
     int maxLife = 20;
     int lifespan = maxLife;
     color blobColor = color(255, 200);
+    boolean touchingState;
     // ArrayList<PVector> points;
     
     Blob(float x_, float y_){
@@ -14,8 +15,10 @@ class Blob {
         id = 0;
         // points = new ArrayList<PVector>();
         // Add blue color to dot qualified
-        stroke(0, 0, 255);        
+        // stroke(0, 0, 255);        
         // points.add(new PVector(x_, y_));
+
+        touchingState = false;
     }
 
     boolean isDisappeared() {
