@@ -9,10 +9,14 @@ float tiltAngle = .0;
 */
 color trackColor;
 PImage img;
+PImage depth;
+int rawDepthValue[];
 
 BlobHandler blobHandler = new BlobHandler();
 ArrayList<Blob> trackedBlobs = new ArrayList<Blob>();
-float similarPixelThreshold = 200;
+float similarPixelThreshold = 2100;
+
+Curtain curtain = new Curtain();
 /*
     Minim Zone
 */
@@ -43,24 +47,26 @@ void setup() {
     minim = new Minim(this);
     out = minim.getLineOut();
     files = new File(sketchPath()+"/data").listFiles();
-    phonographs = new Phonograph[files.length];
-    for(int i=0; i<files.length; i++) {
-        if(files[i].isFile()) {
-            phonographs[i] = new Phonograph(files[i].getName());
-            println(files[i].getName());
-        }
-    }
+    // phonographs = new Phonograph[files.length];
+    // for(int i=0; i<files.length; i++) {
+    //     if(files[i].isFile()) {
+    //         phonographs[i] = new Phonograph(files[i].getName());
+    //         println(files[i].getName());
+    //     }
+    // }
 }
 
 void draw() {
     img = kinect.getVideoImage();
     kinect.setTilt(constrain(tiltAngle, .0, 30.0));
-    // PImage depth = kinect.getDepthImage();
+    depth = kinect.getDepthImage();
     image(img, 0, 0);
-    /*pushMatrix();
-    scale(0.25);
-    image(depth, 0, 0);
-    popMatrix();*/
+    rawDepthValue = kinect.getRawDepth();
+
+    // pushMatrix();
+    // scale(0.25);
+    // image(depth, 0, 0);
+    // popMatrix();
 
     ArrayList<Blob> blobs = new ArrayList<Blob>();
     img.loadPixels();
@@ -81,14 +87,26 @@ void draw() {
             if(d < similarPixelThreshold){
                 blobHandler.addToCompartBlob(blobs, x, y);
             }
+
+            // if(curtain.isAmidCurtain(rawDepthValue[actualLoc]))
+            //     img.pixels[actualLoc] = color(255, 0, 0);
         }
     }
+    img.updatePixels();
+    //image(img, 0, 0);
     blobHandler.deleteNotQualifiedBlobs(blobs);
+    blobHandler.checkOverlappedBlobs(blobs);
     blobHandler.checkTrackedBlobs(trackedBlobs, blobs);
 
     for(Blob b : trackedBlobs){
         b.show();
     }
+
+    curtain.checkBlobTouchingState(trackedBlobs);
+
+    fill(0, 255, 0);
+    text(curtain.closeDistance, 0, 20);
+    text(curtain.farDistance, 0, 40);
 
     // setPhonographs();
 
@@ -97,7 +115,7 @@ void draw() {
     pushMatrix();
     translate(mouseX, mouseY);
     rectMode(CENTER);
-    rect(0,0,50,50);
+    rect(0,0,15,15);
     popMatrix();
 }
 
@@ -164,4 +182,102 @@ void keyPressed() {
     }
     else if (key == ' ')
         tiltAngle = 0;
+    else {
+        switch(key) {
+            case 'q':
+                curtain.addCloseDistance();
+                break;
+            case 'w':
+                curtain.substractCloseDistance();
+                break;
+            case 'a':
+                curtain.addFarDistance();
+                break;
+            case 's':
+                curtain.substractFarDistance();
+                break;
+            default:
+        }
+    }
+}
+
+class Curtain {
+    int closeDistance;
+    int farDistance;
+    int step = 20;
+
+    Curtain() {
+        closeDistance = 860;
+        farDistance = 900;
+    }
+
+    void addCloseDistance() {
+        closeDistance += step;
+        if(isDistanceValid())
+            closeDistance -= step;
+    }
+
+    void substractCloseDistance() {
+        closeDistance -= step;
+        if(isDistanceValid())
+            closeDistance += step;
+    }
+
+    void addFarDistance() {
+        farDistance += step;
+        if(isDistanceValid())
+            farDistance -= step;
+    }
+
+    void substractFarDistance() {
+        farDistance -= step;
+        if(isDistanceValid())
+            farDistance += step;
+    }
+
+    boolean isDistanceValid() {
+        if(closeDistance >= farDistance)
+            return true;
+        return false;
+    }
+
+    boolean isAmidCurtain(int depthValue) {
+        if(depthValue > closeDistance && depthValue < farDistance) {
+            return true;
+        }
+        else
+            return false;
+    }
+
+    boolean isAmidCurtain(Blob b) {
+        PVector position = b.getCenter();
+        int depthValue = rawDepthValue[(int)position.x + (int)position.y*depth.width];
+
+        if(depthValue > closeDistance && depthValue < farDistance) {
+            return true;
+        }
+        else
+            return false;
+    }
+
+    void checkBlobTouchingState(ArrayList<Blob> blobs) {
+        for(Blob b : blobs){
+            if(isAmidCurtain(b)){
+                if(b.touchingState == false){
+                    // blob touch the curtain
+                    // do the trigger thing
+                    b.flipTouchingState();
+                }
+                else {
+                    // do not trigger
+                }
+            }
+            else {
+                // blob leave the curtain
+                if(b.touchingState == true) {
+                    b.flipTouchingState();
+                }
+            }
+        }
+    }
 }

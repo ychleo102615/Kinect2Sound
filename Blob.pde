@@ -1,11 +1,13 @@
 class Blob {
     float upboundX, lowerboundX, upboundY, lowerboundY;
     int id;
-    int maxLife = 20;
+    int maxLife = 5;
     int lifespan = maxLife;
     color blobColor = color(255, 200);
     boolean touchingState;
-    // ArrayList<PVector> points;
+    ArrayList<PVector> points;
+    int blobAddPointThreshold = 1500;
+    float densityThreshold = 75;
     
     Blob(float x_, float y_){
         upboundX = x_;
@@ -13,10 +15,10 @@ class Blob {
         lowerboundX = x_;
         lowerboundY = y_;
         id = 0;
-        // points = new ArrayList<PVector>();
+        points = new ArrayList<PVector>();
         // Add blue color to dot qualified
-        // stroke(0, 0, 255);        
-        // points.add(new PVector(x_, y_));
+        stroke(0, 255, 0);        
+        points.add(new PVector(x_, y_));
 
         touchingState = false;
     }
@@ -47,8 +49,8 @@ class Blob {
         upboundY = max(upboundY, y_);
         lowerboundX = min(lowerboundX, x_);
         lowerboundY = min(lowerboundY, y_);
-        // points.add(new PVector(x_, y_));
-        // point(x_, y_);
+        points.add(new PVector(x_, y_));
+        point(x_, y_);
     }
 
     boolean isNear(float x_, float y_){
@@ -61,14 +63,14 @@ class Blob {
             Points version
             which cost too many cpu resource
         ****/
-        // float d = 10000000;
+        // d = 10000000;
         // for (PVector v : points) {
         //     float tempD = distSq(x_, y_, v.x, v.y);
         //     if (tempD < d) {
         //         d = tempD;
         //     }
         // }
-        if(d < 2500){
+        if(d < blobAddPointThreshold){
             return true;
         }
         else{
@@ -81,6 +83,11 @@ class Blob {
         corner.x = max(min(corner.x, upboundX), lowerboundX);
         corner.y = max(min(corner.y, upboundY), lowerboundY);
         return corner;
+    }
+
+    float distance2Point(float x_, float y_) {
+        PVector center = getCenter();
+        return distSq(center.x, center.y, x_, y_);
     }
 
     PVector getCenter() {
@@ -103,6 +110,7 @@ class Blob {
         PVector center = getCenter();
         text(id, center.x, center.y);
         text(lifespan, center.x, center.y+15);
+        text(blobArea(), center.x, center.y+30);
     }
 
     void setRandomColorById() {
@@ -115,15 +123,15 @@ class Blob {
     }
 
     boolean isBigEnough() {
-        float areaThreshold = 3000;
+        float areaThreshold = 8000;
         if(this.blobArea() > areaThreshold)
             return true;
         else
             return false;
     }
 
-    /*
-    boolean isOverlapedWith(Blob target) {
+    
+    boolean isOverlappedWith(Blob target) {
         if(
             (target.upboundX > lowerboundX && upboundX > target.lowerboundX)&&
             (target.upboundY > lowerboundY && upboundY > target.lowerboundY)
@@ -131,7 +139,15 @@ class Blob {
             return true;
         else
             return false;
-    }*/
+    }
+
+    void combine(Blob target) {
+        upboundX = max(upboundX, target.upboundX);
+        lowerboundX = min(lowerboundX, target.lowerboundX);
+        upboundY = max(upboundY, target.upboundY);
+        lowerboundY = min(lowerboundY, target.lowerboundY);
+        points.addAll(target.points);
+    }
 
     boolean isTooThin() {
         float blobWidth  = upboundX - lowerboundX;
@@ -146,5 +162,34 @@ class Blob {
         }
         else
             return false;//Maybe this should be written in exception
+    }
+
+    boolean isTooSparse() {
+        int pointSum = points.size();
+        float area = blobArea();
+        println("dots and area: "+ pointSum +" "+ area);
+        println("ratio: " + area/pointSum);
+        if(area/pointSum > densityThreshold)
+            return true;
+        return false;
+    }
+
+    void flipTouchingState() {
+        if(touchingState == true) {
+            touchingState = false;
+            setDeactivateColor();
+        }
+        else {
+            touchingState = true;
+            setActivateColor();
+        }
+    }
+
+    void setActivateColor() {
+        blobColor = color(red(blobColor), green(blobColor), blue(blobColor), 255);        
+    }
+
+    void setDeactivateColor() {
+        blobColor = color(red(blobColor), green(blobColor), blue(blobColor), 200);        
     }
 }

@@ -58,24 +58,53 @@ class BlobHandler {
 
     void addToCompartBlob(ArrayList<Blob> blobs, float x, float y) {
         boolean found = false;
+        float minD = 10000000;
+        Blob candidate = null;
             for(Blob b : blobs){
-                if(b.isNear(x,y)){
-                    b.add(x,y);
-                    found = true;
-                    break;
+                // if(b.isNear(x,y)){
+                //     b.add(x,y);
+                //     found = true;
+                //     break;
+                // }
+                if(b.distance2Point(x, y) < minD){
+                    candidate = b;
+                    minD = b.distance2Point(x, y);
                 }
             }
+            if(candidate != null)
+                if(candidate.isNear(x, y)){
+                    candidate.add(x, y);
+                    found = true;
+                }
             if(!found){
-                Blob b = new Blob(x,y);
+                Blob b = new Blob(x, y);
                 blobs.add(b);
             }
     }
 
     void deleteNotQualifiedBlobs(ArrayList<Blob> blobsDetected) {
         for(int i=0; i<blobsDetected.size(); i++) {
-            if(!blobsDetected.get(i).isBigEnough() || blobsDetected.get(i).isTooThin())
+            Blob thisBlob = blobsDetected.get(i);
+            // if(!thisBlob.isBigEnough() || thisBlob.isTooThin())
+            if(!thisBlob.isBigEnough() || thisBlob.isTooThin() || thisBlob.isTooSparse())
                 blobsDetected.remove(i--);
         }
     }
 
+    void checkOverlappedBlobs(ArrayList<Blob> blobs) {
+        Blob blobA = null, blobB = null;
+        for(int i=0; i<blobs.size(); i++) {
+            for(int j=0; j<i; j++) {
+                blobA = blobs.get(i);
+                blobB = blobs.get(j);
+                if(blobA.isOverlappedWith(blobB)){
+                    println("found overlap");
+                    blobA.combine(blobB);
+                    blobs.remove(j);
+                    i--;
+                    j--;
+                }
+            }
+        }
+    }
 }
