@@ -52,8 +52,16 @@ boolean hitFlag[] = new boolean[BlobHandler.maxBlobNum];
     Phonograph
 */
 File[] files;
+String[] fileNames;
 Phonograph[] phonographs;
 AudioSample[] soundEffects;
+/*
+    KeyLight
+*/
+volatile ArrayList<KeyLight> keyLights = new ArrayList<KeyLight>();
+float bpm = 60;
+KeyLightHandler keyLightHandler;
+KeyLightInstrument  instrument;
 
 public void setup() {
     
@@ -74,6 +82,16 @@ public void setup() {
     //         println(files[i].getName());
     //     }
     // }
+    fileNames = new String[files.length];
+    for(int i=0; i<files.length; i++) {
+        if(files[i].isFile()) {
+            fileNames[i] = files[i].getName();
+        }
+    }
+    keyLightHandler = new KeyLightHandler(fileNames);
+    out.setTempo( bpm );
+    instrument = new KeyLightInstrument();
+    out.playNote( 0, 0.25f, instrument );
 }
 
 public void draw() {
@@ -137,6 +155,22 @@ public void draw() {
     rectMode(CENTER);
     rect(0,0,15,15);
     popMatrix();
+
+    drawKeyLightSets();
+
+    pushMatrix();
+    scale(0.25f);
+    image(depth, 3*width, 0);
+    popMatrix();
+}
+
+public void drawKeyLightSets() {
+    for(int i=0; i<fileNames.length; i++){
+        line((i+1)*width/fileNames.length, 0, (i+1)*width/fileNames.length, height);
+    }
+    for(int i=0;i<keyLights.size();i++) {
+        keyLights.get(i).show(i);
+    }
 }
 
 public float distSq(float r1, float g1, float b1, float r2, float g2, float b2){
@@ -151,6 +185,7 @@ public void mousePressed() {
     // int loc = (width-1-mouseX) + mouseY*width;
     int loc = mouseX + mouseY*width;
     trackColor = img.pixels[loc];
+    // keyLightHandler.addOrDeleteKeyLight(keyLights, 0, new PVector(mouseX, mouseY));    
 }
 
 public void setPhonographs() {
@@ -227,8 +262,8 @@ class Curtain {
     int step = 20;
 
     Curtain() {
-        closeDistance = 860;
-        farDistance = 900;
+        closeDistance = 600;
+        farDistance = 700;
     }
 
     public void addCloseDistance() {
@@ -286,6 +321,8 @@ class Curtain {
                 if(b.touchingState == false){
                     // blob touch the curtain
                     // do the trigger thing
+                    keyLightHandler.addOrDeleteKeyLight(keyLights, b.id, b.getCenter());
+                    println("Curtain:get through");
                     b.flipTouchingState();
                 }
                 else {
@@ -295,6 +332,7 @@ class Curtain {
             else {
                 // blob leave the curtain
                 if(b.touchingState == true) {
+                    println("Curtain:leave");                    
                     b.flipTouchingState();
                 }
             }
@@ -470,8 +508,8 @@ class Blob {
     public boolean isTooSparse() {
         int pointSum = points.size();
         float area = blobArea();
-        println("dots and area: "+ pointSum +" "+ area);
-        println("ratio: " + area/pointSum);
+        // println("dots and area: "+ pointSum +" "+ area);
+        // println("ratio: " + area/pointSum);
         if(area/pointSum > densityThreshold)
             return true;
         return false;
@@ -596,7 +634,7 @@ class BlobHandler {
                 blobA = blobs.get(i);
                 blobB = blobs.get(j);
                 if(blobA.isOverlappedWith(blobB)){
-                    println("found overlap");
+                    //println("found overlap");
                     blobA.combine(blobB);
                     blobs.remove(j);
                     i--;
@@ -604,6 +642,227 @@ class BlobHandler {
                 }
             }
         }
+    }
+}
+class KeyLight {
+    AudioSample sample;
+    Sampler sampler;
+    Line ampEnv;
+    float noteLength;
+    PVector position;
+    int noteColor;
+    int id;
+    float lightRadius;
+
+    KeyLight(String fileName, PVector p, int id_) {
+        // sample = minim.loadSample(fileName);
+        sampler = new Sampler(fileName, 4, minim);
+        ampEnv = new Line();
+        ampEnv.patch(sampler.amplitude);
+        sampler.patch(out);
+        // noteLength = sample.length();
+        position = p;
+        id = id_;
+        lightRadius = keyLightHandler.gridScale;
+        setRandomColorById();
+    }
+    
+    // AudioSample getSample() {
+    //     return sample;
+    // }
+
+    public void setLightRadius(float givenRadius) {
+        lightRadius = givenRadius;
+    }
+
+    public void createSound(float releaseTime) {
+        ampEnv.activate( releaseTime, 1.5f, 0 );
+        sampler.trigger();
+        setActivateColor();
+    }
+
+    public void closeSound() {
+        sampler.stop();
+        setDeactivateColor();
+    }
+
+    public float getLength() {
+        return noteLength;
+    }
+
+    public void setLength(float len) {
+        noteLength = len;
+    }
+
+    public void show() {
+        fill(noteColor);
+        ellipse(position.x, position.y, lightRadius, lightRadius);
+        fill(255);
+        text(id, position.x, position.y);
+    }
+    public void show(int order) {
+        fill(noteColor);
+        ellipse(position.x, position.y, lightRadius, lightRadius);
+        fill(255);
+        text(id, position.x, position.y);
+        text(order, position.x, position.y+10);
+    }
+
+    public void setRandomColorById() {
+        randomSeed(id+(int)random(12345678));
+        noteColor = color(random(0, 255), random(0, 255), random(0, 255), 128);
+    }
+
+    public void setActivateColor() {
+        noteColor = color(red(noteColor), green(noteColor), blue(noteColor), 255);        
+    }
+
+    public void setDeactivateColor() {
+        noteColor = color(red(noteColor), green(noteColor), blue(noteColor), 128);        
+    }
+
+    public void showColor() {
+        println(id, red(noteColor), green(noteColor), blue(noteColor), alpha(noteColor));
+    }
+}
+
+class KeyLightInstrument implements Instrument{
+
+    int notePointer;
+    KeyLight thisNote;
+    KeyLightInstrument() {
+        notePointer = 0;
+    }
+
+    public void noteOn(float duration) {
+        if(keyLights.size() > 0) {
+            thisNote = keyLights.get(notePointer);
+            thisNote.createSound(0.8f*duration);
+            println("<<<<<<note on<<<<<");
+        }
+        //else
+            // println("nothing in que..");
+    }
+
+    public void noteOff() {
+        if(keyLights.size() > 0){
+            println(">>>>note off>>>>");
+            if(thisNote != null)
+                thisNote.closeSound();
+            
+            // Proceed to next note
+            // println("notePointer: "+notePointer);            
+            int nextNotePointer = (notePointer+1) % keyLights.size();
+            // println("notePointer after: "+notePointer);            
+            float msOfNextNote = keyLights.get(nextNotePointer).getLength();
+            out.playNote( 0, milliSeconds2beats(msOfNextNote), this );
+            notePointer = nextNotePointer;
+            println("next's length: " + msOfNextNote);
+        }
+        else{//keep waiting for keylight
+            out.playNote(0, 0.25f, this);
+            // println("playing nothing...");
+        }
+    }
+
+    public float milliSeconds2beats(float second) {
+        float bpm = out.getTempo();
+        return second/1000 * bpm/60;
+    }
+
+    public void deleteNote() {
+        notePointer--;
+        if(notePointer < 0)
+            notePointer = 0;
+    }
+}
+class KeyLightHandler {
+    File[] files;
+    String[] fileNames;
+    AudioSample[] samples;
+    Sampler[] samplers;
+    int gridScale = 100;
+
+    KeyLightHandler(){}
+
+    KeyLightHandler(String[] fileNames_) {
+        fileNames = fileNames_;
+    }
+
+    public void readSamples() {
+        samples = new AudioSample[fileNames.length];
+        samplers = new Sampler[fileNames.length];
+        for(int i=0; i<fileNames.length; i++) {
+            println("fileName: "+fileNames[i]);
+            samples[i] = minim.loadSample(fileNames[i]);
+            samplers[i] = new Sampler(fileNames[i], 4, minim);
+            samplers[i].patch(out);
+        }
+    }
+
+    public void addOrDeleteKeyLight(ArrayList<KeyLight> keyLights, int idNote, PVector position) {
+        position = mouse2Grid(position);
+        boolean deleteFlag = false;
+
+        for(KeyLight k : keyLights) {
+            if(PVector.dist(k.position, position) == 0){
+                deleteFlag = true;
+                keyLights.remove(k);
+                instrument.deleteNote();
+                break;
+            }
+        }
+        if(deleteFlag == false){
+            KeyLight newLight = new KeyLight(getSampleNameByPosition(position), 
+                                            position, idNote);
+            keyLights.add(newLight);
+        }
+        caculateDistancesOfKeyLights(keyLights);
+    }
+
+    public PVector mouse2Grid(PVector mousePosition) {
+        mousePosition.x += -mousePosition.x % gridScale + gridScale/2;
+        mousePosition.y += -mousePosition.y % gridScale + gridScale/2;
+        return mousePosition;
+    }
+
+    public String getSampleNameByPosition(PVector position) {
+        int gridNum = fileNames.length;
+        float gridLength = width/gridNum;
+
+        // This seems to be an ugly code
+        for(int i=0;i<fileNames.length; i++) {
+            if(position.x < gridLength*(i+1)){
+                return fileNames[i];
+            }
+        }
+        return "";
+    }
+
+    public void caculateDistancesOfKeyLights(ArrayList<KeyLight> keyLights) {
+        int size = keyLights.size();
+        float distance;
+        float dis2timeFactor = 5;
+        KeyLight thisOne;// = keyLights.get(0);
+        KeyLight nextOne;
+
+        if(size == 0)
+            return;
+        thisOne = keyLights.get(0);
+        if(size > 1) {
+            for(int i=0; i<size-1; i++) {
+                nextOne = keyLights.get(i+1);
+                distance = PVector.dist(thisOne.position, 
+                                        nextOne.position);
+                thisOne.setLength(distance*dis2timeFactor);
+                thisOne = nextOne;
+            }
+            nextOne = keyLights.get(0);
+            distance = PVector.dist(thisOne.position, nextOne.position);
+            thisOne.setLength(distance*dis2timeFactor);
+        }
+        else if (size == 1)
+            thisOne.setLength(1500.0f);
     }
 }
 class Phonograph {

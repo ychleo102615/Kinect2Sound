@@ -98,7 +98,7 @@ class BlobHandler {
                 blobA = blobs.get(i);
                 blobB = blobs.get(j);
                 if(blobA.isOverlappedWith(blobB)){
-                    println("found overlap");
+                    //println("found overlap");
                     blobA.combine(blobB);
                     blobs.remove(j);
                     i--;

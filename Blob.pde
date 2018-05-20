@@ -167,8 +167,8 @@ class Blob {
     boolean isTooSparse() {
         int pointSum = points.size();
         float area = blobArea();
-        println("dots and area: "+ pointSum +" "+ area);
-        println("ratio: " + area/pointSum);
+        // println("dots and area: "+ pointSum +" "+ area);
+        // println("ratio: " + area/pointSum);
         if(area/pointSum > densityThreshold)
             return true;
         return false;

@@ -32,8 +32,16 @@ boolean hitFlag[] = new boolean[BlobHandler.maxBlobNum];
     Phonograph
 */
 File[] files;
+String[] fileNames;
 Phonograph[] phonographs;
 AudioSample[] soundEffects;
+/*
+    KeyLight
+*/
+volatile ArrayList<KeyLight> keyLights = new ArrayList<KeyLight>();
+float bpm = 60;
+KeyLightHandler keyLightHandler;
+KeyLightInstrument  instrument;
 
 void setup() {
     size(640, 480);
@@ -54,6 +62,16 @@ void setup() {
     //         println(files[i].getName());
     //     }
     // }
+    fileNames = new String[files.length];
+    for(int i=0; i<files.length; i++) {
+        if(files[i].isFile()) {
+            fileNames[i] = files[i].getName();
+        }
+    }
+    keyLightHandler = new KeyLightHandler(fileNames);
+    out.setTempo( bpm );
+    instrument = new KeyLightInstrument();
+    out.playNote( 0, 0.25f, instrument );
 }
 
 void draw() {
@@ -117,6 +135,22 @@ void draw() {
     rectMode(CENTER);
     rect(0,0,15,15);
     popMatrix();
+
+    drawKeyLightSets();
+
+    pushMatrix();
+    scale(0.25);
+    image(depth, 3*width, 0);
+    popMatrix();
+}
+
+void drawKeyLightSets() {
+    for(int i=0; i<fileNames.length; i++){
+        line((i+1)*width/fileNames.length, 0, (i+1)*width/fileNames.length, height);
+    }
+    for(int i=0;i<keyLights.size();i++) {
+        keyLights.get(i).show(i);
+    }
 }
 
 float distSq(float r1, float g1, float b1, float r2, float g2, float b2){
@@ -131,6 +165,7 @@ void mousePressed() {
     // int loc = (width-1-mouseX) + mouseY*width;
     int loc = mouseX + mouseY*width;
     trackColor = img.pixels[loc];
+    // keyLightHandler.addOrDeleteKeyLight(keyLights, 0, new PVector(mouseX, mouseY));    
 }
 
 void setPhonographs() {
@@ -207,8 +242,8 @@ class Curtain {
     int step = 20;
 
     Curtain() {
-        closeDistance = 860;
-        farDistance = 900;
+        closeDistance = 600;
+        farDistance = 700;
     }
 
     void addCloseDistance() {
@@ -266,6 +301,8 @@ class Curtain {
                 if(b.touchingState == false){
                     // blob touch the curtain
                     // do the trigger thing
+                    keyLightHandler.addOrDeleteKeyLight(keyLights, b.id, b.getCenter());
+                    println("Curtain:get through");
                     b.flipTouchingState();
                 }
                 else {
@@ -275,6 +312,7 @@ class Curtain {
             else {
                 // blob leave the curtain
                 if(b.touchingState == true) {
+                    println("Curtain:leave");                    
                     b.flipTouchingState();
                 }
             }
