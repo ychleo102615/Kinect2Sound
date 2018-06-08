@@ -29,12 +29,10 @@ AudioOutput out;
 String baseTone = "C3";
 boolean hitFlag[] = new boolean[BlobHandler.maxBlobNum];
 /*
-    Phonograph
+    File
 */
 File[] files;
 String[] fileNames;
-Phonograph[] phonographs;
-AudioSample[] soundEffects;
 /*
     KeyLight
 */
@@ -42,6 +40,11 @@ volatile ArrayList<KeyLight> keyLights = new ArrayList<KeyLight>();
 float bpm = 60;
 KeyLightHandler keyLightHandler;
 KeyLightInstrument  instrument;
+/*
+    Baton
+*/
+SampleBox sampleBox;
+BatonInstrument batonInstrument;
 
 void setup() {
     size(640, 480);
@@ -55,13 +58,6 @@ void setup() {
     minim = new Minim(this);
     out = minim.getLineOut();
     files = new File(sketchPath()+"/data").listFiles();
-    // phonographs = new Phonograph[files.length];
-    // for(int i=0; i<files.length; i++) {
-    //     if(files[i].isFile()) {
-    //         phonographs[i] = new Phonograph(files[i].getName());
-    //         println(files[i].getName());
-    //     }
-    // }
     fileNames = new String[files.length];
     for(int i=0; i<files.length; i++) {
         if(files[i].isFile()) {
@@ -69,9 +65,12 @@ void setup() {
         }
     }
     keyLightHandler = new KeyLightHandler(fileNames);
+    sampleBox = new SampleBox(fileNames);
     out.setTempo( bpm );
     instrument = new KeyLightInstrument();
-    out.playNote( 0, 0.25f, instrument );
+    batonInstrument = new BatonInstrument();
+    //out.playNote( 0, 0.25f, instrument );
+    out.playNote(0, 0.25f, batonInstrument);
 }
 
 void draw() {
@@ -126,8 +125,6 @@ void draw() {
     text(curtain.closeDistance, 0, 20);
     text(curtain.farDistance, 0, 40);
 
-    // setPhonographs();
-
     // Show track color
     fill(trackColor);
     pushMatrix();
@@ -136,8 +133,10 @@ void draw() {
     rect(0,0,15,15);
     popMatrix();
 
-    drawKeyLightSets();
+    drawScreenGrid();
+    //drawKeyLightSets();
 
+    // draw depth image
     pushMatrix();
     scale(0.25);
     image(depth, 3*width, 0);
@@ -145,11 +144,15 @@ void draw() {
 }
 
 void drawKeyLightSets() {
-    for(int i=0; i<fileNames.length; i++){
-        line((i+1)*width/fileNames.length, 0, (i+1)*width/fileNames.length, height);
-    }
     for(int i=0;i<keyLights.size();i++) {
         keyLights.get(i).show(i);
+    }
+}
+
+void drawScreenGrid() {
+    stroke(255);
+    for(int i=0; i<fileNames.length; i++){
+        line((i+1)*width/fileNames.length, 0, (i+1)*width/fileNames.length, height);
     }
 }
 
@@ -168,6 +171,7 @@ void mousePressed() {
     // keyLightHandler.addOrDeleteKeyLight(keyLights, 0, new PVector(mouseX, mouseY));    
 }
 
+/*
 void setPhonographs() {
     int gridNum = phonographs.length;
     int gridLength = width/gridNum;
@@ -206,6 +210,7 @@ void setPhonographs() {
         gridIndex++;
     }
 }
+*/
 
 void keyPressed() {
     float skip = 0.25;
@@ -276,6 +281,47 @@ class Curtain {
         return false;
     }
 
+    void checkBlobTouchingState(ArrayList<Blob> blobs) {
+        for(Blob b : blobs){
+            if(isAmidCurtain(b)){
+                if(b.touchingState == false){
+                    // blob touch the curtain
+                    // do the trigger thing
+                    blobTouch(b);
+                    /*
+                    keyLightHandler.addOrDeleteKeyLight(keyLights, b.id, b.getCenter());
+                    println("Curtain:get through");
+                    b.flipTouchingState();
+                    */
+                }
+                else {
+                    // do not trigger
+                }
+            }
+            else {
+                // blob leave the curtain
+                if(b.touchingState == true) {
+                    blobLeave(b);
+                    /*
+                    println("Curtain:leave");                    
+                    b.flipTouchingState();
+                    */
+                }
+            }
+        }
+    }
+
+    void blobTouch(Blob b) {
+        keyLightHandler.addOrDeleteKeyLight(keyLights, b.id, b.getCenter());
+        // println("Curtain:get through");
+        b.flipTouchingState();
+    }
+
+    void blobLeave(Blob b) {
+        // println("Curtain:leave");                    
+        b.flipTouchingState();
+    }
+
     boolean isAmidCurtain(int depthValue) {
         if(depthValue > closeDistance && depthValue < farDistance) {
             return true;
@@ -293,29 +339,5 @@ class Curtain {
         }
         else
             return false;
-    }
-
-    void checkBlobTouchingState(ArrayList<Blob> blobs) {
-        for(Blob b : blobs){
-            if(isAmidCurtain(b)){
-                if(b.touchingState == false){
-                    // blob touch the curtain
-                    // do the trigger thing
-                    keyLightHandler.addOrDeleteKeyLight(keyLights, b.id, b.getCenter());
-                    println("Curtain:get through");
-                    b.flipTouchingState();
-                }
-                else {
-                    // do not trigger
-                }
-            }
-            else {
-                // blob leave the curtain
-                if(b.touchingState == true) {
-                    println("Curtain:leave");                    
-                    b.flipTouchingState();
-                }
-            }
-        }
     }
 }
